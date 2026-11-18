@@ -1,4 +1,4 @@
-package com.banking.fraud_detection_service;
+package com.banking.fraud_detection_service.service;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

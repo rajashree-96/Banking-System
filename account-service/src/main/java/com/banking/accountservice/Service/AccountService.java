@@ -77,7 +77,7 @@ public class AccountService {
     /* Deduct Balance -called by Transaction service
     @param accountNumber , @param  amount  */
     public void deductBalance(String accountNumber,BigDecimal amount){
-        log.info("Deducting balance {} from amount{}",amount,accountNumber);
+        log.info("Deducting balance {} from account{}",amount,accountNumber);
 
         Account account = accountRepo.findByAccountNumber(accountNumber)
                 .orElseThrow(()->new RuntimeException("Account not found"));
@@ -96,7 +96,7 @@ public class AccountService {
     /* Credit Balance -called by Transaction service via Kafka
         @param accountNumber , @param  amount  */
     public void creditBalance(String accountNumber,BigDecimal amount){
-        log.info("Crediting {} to amount{}",amount,accountNumber);
+        log.info("Crediting {} to account{}",amount,accountNumber);
         Account account = accountRepo.findByAccountNumber(accountNumber)
                 .orElseThrow(()->new RuntimeException("Account not found"));
         account.setBalance(account.getBalance().add(amount));//adding amount to balance
@@ -117,7 +117,7 @@ public class AccountService {
 
     //set values from Account (Entity) to AccountResponse(DTO) -->To store values in DTO when account is created
     private AccountResponse mapToReponse(Account account) {
-        AccountResponse response=new AccountResponse();
+        AccountResponse response = new AccountResponse();
         response.setId(account.getId());
         response.setAccountNumber(account.getAccountNumber());
         response.setAccountHolderNumber(account.getAccountHolderNumber());
