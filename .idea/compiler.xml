@@ -11,9 +11,8 @@
         <outputRelativeToContentRoot value="true" />
         <module name="api-gateway" />
         <module name="paymentservice" />
-        <module name="notification-service" />
       </profile>
-      <profile name="Annotation profile for fraud-detection-service" enabled="true">
+      <profile name="Annotation profile for notification-service" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
@@ -23,6 +22,7 @@
         <module name="transaction-service" />
         <module name="untitled" />
         <module name="account-service" />
+        <module name="notification-service" />
         <module name="fraud-detection-service" />
       </profile>
     </annotationProcessing>
@@ -31,6 +31,7 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="account-service" options="-parameters" />
       <module name="fraud-detection-service" options="-parameters" />
+      <module name="notification-service" options="-parameters" />
       <module name="transaction-service" options="-parameters" />
       <module name="untitled" options="-parameters" />
     </option>
