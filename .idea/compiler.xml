@@ -10,9 +10,8 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="api-gateway" />
-        <module name="paymentservice" />
       </profile>
-      <profile name="Annotation profile for notification-service" enabled="true">
+      <profile name="Annotation profile for paymentservice" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
@@ -22,6 +21,7 @@
         <module name="transaction-service" />
         <module name="untitled" />
         <module name="account-service" />
+        <module name="paymentservice" />
         <module name="notification-service" />
         <module name="fraud-detection-service" />
       </profile>
@@ -32,6 +32,7 @@
       <module name="account-service" options="-parameters" />
       <module name="fraud-detection-service" options="-parameters" />
       <module name="notification-service" options="-parameters" />
+      <module name="paymentservice" options="-parameters" />
       <module name="transaction-service" options="-parameters" />
       <module name="untitled" options="-parameters" />
     </option>

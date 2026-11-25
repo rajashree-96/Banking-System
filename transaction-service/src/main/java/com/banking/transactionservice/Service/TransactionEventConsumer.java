@@ -6,6 +6,7 @@ import com.banking.transactionservice.Repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
@@ -23,10 +24,13 @@ public class TransactionEventConsumer {
      * Generate OTP and ask user to verify
      * @param payload
      */
-    private final TransactionRepository transactionRepo;
-    private final RedisTemplate<String,String> redisTemplate;
     private static final long OTP_EXPIRE_MINUTES = 5;
+    private final TransactionRepository transactionRepo;
+    private final TransactionService transactionService;
+    //Kafka and Redis Template
     private final KafkaTemplate<String,Object>kafkaTemplate;
+    private final RedisTemplate<String,String> redisTemplate;
+    //topic
     private static  final String TRANSACTION_OTP_GENERATED_TOPIC ="transaction.otp.generated";
 
     public void consumeVerificationRequired(@Payload Map<String,Object> payload){
@@ -69,5 +73,18 @@ public class TransactionEventConsumer {
      catch(Exception e){
        log.error("Error handling Verification required :{}",e.getMessage());
      }
+    }
+
+    @KafkaListener(topics = "fraud.check.clean")
+    public void  consumeFraudCheckCleanResult(@Payload Map<String,Object> payload){
+          try{
+              String transactionId= (String) payload.get("transactionId");
+              String accountNumber = (String) payload.get("accountNumber");
+              transactionService.processCleanResult(transactionId);
+
+          }
+          catch(Exception e){
+            log.error("Error Processing Fraud check :{}",e.getMessage());
+          }
     }
 }

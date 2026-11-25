@@ -7,6 +7,7 @@ import com.banking.transactionservice.DTO.TransferRequest;
 import com.banking.transactionservice.Entity.Transaction;
 import com.banking.transactionservice.Entity.TransactionStatus;
 import com.banking.transactionservice.Entity.TransactionType;
+import com.banking.transactionservice.Event.TransactionCompletedEvent;
 import com.banking.transactionservice.Event.TransactionInitiatedEvent;
 import com.banking.transactionservice.Repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +16,10 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -32,10 +36,10 @@ public class TransactionService {
     private final RedisTemplate<String,String>redisTemplate;
 
     //kafka topics variables
-    private static final String TRANSACTION_INITIATED_TOPIC ="transaction.initiated";
-    private static final String TRANSACTION_COMPLETED_TOPIC ="transaction.completed";
-    private static final String TRANSACTION_REFUNDED_TOPIC ="transaction.refunded";
-
+    private static final String TRANSACTION_INITIATED_TOPIC = "transaction.initiated";
+    private static final String TRANSACTION_COMPLETED_TOPIC = "transaction.completed";
+    private static final String TRANSACTION_REFUNDED_TOPIC = "transaction.refunded";
+    private static final String TRANSACTION_FRAUD_DETECTED_TOPIC = "fraud.detected";
     /**
      * SAGA Step 1:Initiate Transfer
      * Deducts from sender called from AccountService via FeignClient(AccountServiceClient)
@@ -131,9 +135,64 @@ public class TransactionService {
     private void compensateTransaction(Transaction transaction, String reason) {
        log.warn("SAGA COMPENSATION -refunding :{} amount:{}",
                transaction.getSenderAccountNumber(),transaction.getAmount());
-       //Credit money back to sender Synchronously
+
+       //Credit money back to sender Synchronously - done by Feign Client(AccountServiceClient)
+        accountServiceClient.creditBalance(transaction.getSenderAccountNumber(), transaction.getAmount());
+
+        transaction.setStatus(TransactionStatus.FLAGGED);//it is blocked
+        transaction.setFailureReason(reason+" - SAGA Compensation executed ,amount refunded"+ LocalDateTime.now());
+
+        transactionRepo.save(transaction);
+
+        //Publish Refund Event - Notification Service will alert user (refund is issued)
+        Map<String,Object> refundEvent = new HashMap<>();
+        refundEvent.put("transactionId",transaction.getId());
+        refundEvent.put("senderAccountNumber",transaction.getSenderAccountNumber());
+        refundEvent.put("amount",transaction.getAmount());
+        refundEvent.put("reason",reason);
+
+       kafkaTemplate.send(TRANSACTION_REFUNDED_TOPIC,transaction.getId(),refundEvent);
+       log.info("SAGA COMPENSATION COMPLETE-{} refunded to {}", transaction.getAmount(),transaction.getSenderAccountNumber());
+
     }
 
+    private void blockAccountAndCompensate(Transaction transaction, String reason) {
+       //Publish fraud.detected event  -> Account Service will block account
+        Map<String,Object> fraudEvent = new HashMap<>();
+        fraudEvent.put("transactionId",transaction.getId());
+        fraudEvent.put("accountNumber",transaction.getSenderAccountNumber());
+        fraudEvent.put("reason",reason);
+
+        kafkaTemplate.send(TRANSACTION_FRAUD_DETECTED_TOPIC,transaction.getSenderAccountNumber(),fraudEvent);
+        log.warn("fraud.detected published:account{} will be blocked,Kindly contact to your bank",transaction.getSenderAccountNumber());
+
+      //SAGA COMPENSATION -refund sender
+        compensateTransaction(transaction,reason);
+    }
+
+    private void completeTransaction(Transaction transaction) {
+           transaction.setStatus(TransactionStatus.COMPLETED);
+           transaction.setCompletedAt(LocalDateTime.now());
+           transactionRepo.save(transaction);
+           //Publish event
+        TransactionCompletedEvent completedEvent= new TransactionCompletedEvent(
+                                        transaction.getId(), transaction.getSenderAccountNumber(),
+                 transaction.getReceiverAccountNumber(),transaction.getAmount(),transaction.getDescription());
+        kafkaTemplate.send(TRANSACTION_COMPLETED_TOPIC,transaction.getId(),completedEvent);
+        log.info("SAGA COMPLETE -Transaction:{}completed",transaction.getId());
+    }
+
+    public void processCleanResult(String transactionId) {
+        Transaction transaction = transactionRepo.findById(transactionId)
+                .orElseThrow(()-> new RuntimeException("Transaction not found "+transactionId));
+
+        //verification required Event
+        if(transaction.getStatus()!= TransactionStatus.PROCESSING){//if completed/blocked ,skip transaction 2nd time
+            log.warn("Transaction{} not PROCESSING -skipping",transactionId);
+            return ;
+        }
+        completeTransaction(transaction);
+    }
 
     private TransactionResponse mapToResponse(Transaction transaction) {
 //convert Transaction to TransactionResponse
